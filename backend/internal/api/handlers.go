@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"t-9/internal/game"
+	"t-9/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
@@ -75,7 +76,7 @@ func generateGameID() string {
 
 var gameManager *GameManager
 
-func SetupRoutes() *gin.Engine {
+func SetupRoutes(hub *ws.Hub) *gin.Engine {
 	gameManager = NewGameManager()
 	r := gin.Default()
 
@@ -92,6 +93,9 @@ func SetupRoutes() *gin.Engine {
 		
 		c.Next()
 	})
+
+	// WebSocket endpoint
+	r.GET("/ws", hub.ServeWS)
 
 	api := r.Group("/api/v1")
 	{
