@@ -1,13 +1,13 @@
 import type { GameState, Move, Player } from './types';
 
- // Helper function to get the WebSocket URL based on current location
+// Helper function to get the WebSocket URL based on current location
 function getDefaultWebSocketURL(): string {
-	if (typeof window === 'undefined') {
-		return 'ws://localhost:8080/ws';
-	}
-	const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-	const host = window.location.host;
-	return '${protocol}//${host}/ws';
+  if (typeof window === 'undefined') {
+    return 'ws://localhost:8080/ws';
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}/ws`;
 }
 
 export interface WSMessage {
