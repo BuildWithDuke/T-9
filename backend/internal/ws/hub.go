@@ -16,6 +16,12 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const (
+	maxRooms         = 100               // Maximum concurrent game rooms
+	roomTimeout      = 30 * time.Minute  // Delete inactive rooms after 30 minutes
+	cleanupInterval  = 5 * time.Minute   // Run cleanup every 5 minutes
+)
+
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		// Get the Origin header
@@ -99,6 +105,14 @@ func NewHub() *Hub {
 
 // Run starts the hub's main loop
 func (h *Hub) Run() {
+	// Start cleanup goroutine
+	ticker := time.NewTicker(cleanupInterval)
+	go func() {
+		for range ticker.C {
+			h.cleanupInactiveRooms()
+		}
+	}()
+
 	for {
 		select {
 		case client := <-h.register:
@@ -234,14 +248,25 @@ func (h *Hub) handleJoinGame(client *Client, gameID string) {
 
 	room, exists := h.rooms[gameID]
 	if !exists {
+		// Check if we've hit max rooms limit
+		if len(h.rooms) >= maxRooms {
+			h.sendError(client, "Server is at capacity. Please try again later.")
+			log.Printf("Max rooms reached (%d), rejecting new game", maxRooms)
+			return
+		}
+
 		// Create new room
 		room = &GameRoom{
-			ID:      gameID,
-			Game:    game.NewGame(),
-			Clients: make(map[string]*Client),
+			ID:           gameID,
+			Game:         game.NewGame(),
+			Clients:      make(map[string]*Client),
+			LastActivity: time.Now(),
 		}
 		h.rooms[gameID] = room
 	}
+
+	// Update activity timestamp
+	room.LastActivity = time.Now()
 
 	// Check if room is full
 	if len(room.Clients) >= 2 {
@@ -297,6 +322,11 @@ func (h *Hub) handleMove(client *Client, move game.Move) {
 		h.sendError(client, err.Error())
 		return
 	}
+
+	// Update room activity
+	h.mu.Lock()
+	room.LastActivity = time.Now()
+	h.mu.Unlock()
 
 	// Broadcast updated game state to all players in room
 	msg := Message{
@@ -371,11 +401,38 @@ func generateSecureString(length int) string {
 		// Fallback to timestamp if crypto/rand fails
 		return strconv.FormatInt(time.Now().UnixNano(), 36)
 	}
-	
+
 	// Convert random bytes to charset
 	for i := range b {
 		b[i] = charset[b[i]%byte(len(charset))]
 	}
-	
+
 	return string(b) + "_" + strconv.FormatInt(time.Now().UnixNano(), 36)
+}
+
+// cleanupInactiveRooms removes rooms that haven't had activity in a while
+func (h *Hub) cleanupInactiveRooms() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	now := time.Now()
+	deletedCount := 0
+
+	for gameID, room := range h.rooms {
+		if now.Sub(room.LastActivity) > roomTimeout {
+			// Notify any remaining clients
+			for _, client := range room.Clients {
+				h.sendError(client, "Game closed due to inactivity")
+				client.Conn.Close()
+			}
+
+			delete(h.rooms, gameID)
+			deletedCount++
+			log.Printf("Cleaned up inactive room: %s (inactive for %v)", gameID, now.Sub(room.LastActivity))
+		}
+	}
+
+	if deletedCount > 0 {
+		log.Printf("Cleanup complete: removed %d inactive rooms, %d rooms remaining", deletedCount, len(h.rooms))
+	}
 }

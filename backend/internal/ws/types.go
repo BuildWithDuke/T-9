@@ -2,6 +2,7 @@ package ws
 
 import (
 	"t-9/internal/game"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -17,11 +18,12 @@ type Client struct {
 
 // GameRoom manages a multiplayer game session
 type GameRoom struct {
-	ID      string
-	Game    *game.GameState
-	Clients map[string]*Client
-	PlayerX *Client
-	PlayerO *Client
+	ID           string
+	Game         *game.GameState
+	Clients      map[string]*Client
+	PlayerX      *Client
+	PlayerO      *Client
+	LastActivity time.Time
 }
 
 // Message types for WebSocket communication

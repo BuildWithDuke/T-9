@@ -33,7 +33,7 @@ func NewGameManager() *GameManager {
 func (gm *GameManager) CreateGame(c *gin.Context) {
 	gameID := generateGameID()
 	newGame := game.NewGame()
-	
+
 	gm.mu.Lock()
 	gm.games[gameID] = newGame
 	gm.mu.Unlock()
