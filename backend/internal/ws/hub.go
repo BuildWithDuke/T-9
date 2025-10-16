@@ -1,11 +1,14 @@
 package ws
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
+	"t-9/internal/config"
 	"t-9/internal/game"
 	"time"
 
@@ -15,8 +18,64 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for development
+		// Get the Origin header
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			// No Origin header, likely same-origin request
+			return true
+		}
+
+		// In production, validate against specific origins
+		if isProduction() {
+			return isValidOrigin(origin)
+		}
+
+		// Development: allow localhost and common dev origins
+		return isDevelopmentOrigin(origin)
 	},
+}
+
+// isProduction checks if we're running in production
+func isProduction() bool {
+	// Check environment variable, could be expanded with other checks
+	return getEnv("ENVIRONMENT", "development") == "production"
+}
+
+// isValidOrigin validates origin against allowed production origins
+func isValidOrigin(origin string) bool {
+	allowedOrigins := config.DefaultConfig.CORS.AllowedOrigins
+	
+	for _, allowed := range allowedOrigins {
+		if origin == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+// isDevelopmentOrigin allows common development origins
+func isDevelopmentOrigin(origin string) bool {
+	allowedDevOrigins := []string{
+		"http://localhost:5173",
+		"http://localhost:4173",
+		"http://127.0.0.1:5173",
+		"http://127.0.0.1:4173",
+	}
+	
+	for _, allowed := range allowedDevOrigins {
+		if origin == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+// getEnv gets environment variable with default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }
 
 // Hub manages all game rooms and WebSocket connections
@@ -299,19 +358,24 @@ func (h *Hub) broadcastToRoom(room *GameRoom, msg Message) {
 	}
 }
 
-// generateClientID creates a unique client ID
+// generateClientID creates a unique client ID using secure random generation
 func generateClientID() string {
-	// Simple implementation - in production, use UUID
-	return "client_" + randomString(8)
+	return "client_" + generateSecureString(8)
 }
 
-// randomString generates a random string of given length
-func randomString(length int) string {
+// generateSecureString generates a cryptographically secure random string
+func generateSecureString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[i%len(charset)] // Simple cycling implementation
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp if crypto/rand fails
+		return strconv.FormatInt(time.Now().UnixNano(), 36)
 	}
-	// Add timestamp to make it unique
+	
+	// Convert random bytes to charset
+	for i := range b {
+		b[i] = charset[b[i]%byte(len(charset))]
+	}
+	
 	return string(b) + "_" + strconv.FormatInt(time.Now().UnixNano(), 36)
 }

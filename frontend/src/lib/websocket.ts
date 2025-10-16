@@ -10,11 +10,23 @@ export interface WSMessage {
   message?: string;
 }
 
+export interface WebSocketEvents {
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  onGameState?: (gameState: GameState) => void;
+  onPlayerJoin?: (message: string) => void;
+  onPlayerLeave?: (message: string) => void;
+  onError?: (error: string) => void;
+  onMove?: (move: Move) => void;
+}
+
 export class GameWebSocket {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private events: WebSocketEvents = {};
+  private connectionPromise: Promise<void> | null = null;
 
   // State properties that components can access
   public connected: boolean = false;
@@ -23,10 +35,21 @@ export class GameWebSocket {
   public error: string = '';
   public playerJoinMessage: string = '';
 
-  constructor(private url: string = 'ws://localhost:8080/ws') {}
+  constructor(
+    private url: string = 'ws://localhost:8080/ws',
+    events?: WebSocketEvents
+  ) {
+    if (events) {
+      this.events = { ...events };
+    }
+  }
 
   connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
+    if (this.connectionPromise) {
+      return this.connectionPromise;
+    }
+
+    this.connectionPromise = new Promise((resolve, reject) => {
       try {
         this.ws = new WebSocket(this.url);
 
@@ -34,6 +57,7 @@ export class GameWebSocket {
           this.connected = true;
           this.reconnectAttempts = 0;
           this.error = '';
+          this.events.onConnect?.();
           resolve();
         };
 
@@ -43,22 +67,27 @@ export class GameWebSocket {
             this.handleMessage(message);
           } catch (err) {
             console.error('Failed to parse WebSocket message:', err);
+            this.events.onError?.('Failed to parse message');
           }
         };
 
         this.ws.onclose = (event) => {
           this.connected = false;
+          this.events.onDisconnect?.();
           this.attemptReconnect();
         };
 
         this.ws.onerror = (error) => {
           this.error = 'Connection error - backend may not be running';
+          this.events.onError?.(this.error);
           reject(error);
         };
       } catch (err) {
         reject(err);
       }
     });
+
+    return this.connectionPromise;
   }
 
   private handleMessage(message: WSMessage) {
@@ -66,26 +95,38 @@ export class GameWebSocket {
       case 'game_state':
         if (message.game) {
           this.gameState = message.game;
+          this.events.onGameState?.(message.game);
         }
         break;
 
       case 'player_join':
         if (message.message) {
           this.playerJoinMessage = message.message;
+          this.events.onPlayerJoin?.(message.message);
           // Clear message after 3 seconds
-          setTimeout(() => this.playerJoinMessage = '', 3000);
+          setTimeout(() => {
+            this.playerJoinMessage = '';
+          }, 3000);
         }
         break;
 
       case 'player_leave':
         if (message.message) {
           this.error = message.message;
+          this.events.onPlayerLeave?.(message.message);
         }
         break;
 
       case 'error':
         if (message.error) {
           this.error = message.error;
+          this.events.onError?.(message.error);
+        }
+        break;
+
+      case 'move':
+        if (message.move) {
+          this.events.onMove?.(message.move);
         }
         break;
 
@@ -103,6 +144,7 @@ export class GameWebSocket {
       this.ws.send(JSON.stringify(message));
     } else {
       this.error = 'Not connected to server';
+      this.events.onError?.(this.error);
     }
   }
 
@@ -115,6 +157,7 @@ export class GameWebSocket {
       this.ws.send(JSON.stringify(message));
     } else {
       this.error = 'Not connected to server';
+      this.events.onError?.(this.error);
     }
   }
 
@@ -123,12 +166,14 @@ export class GameWebSocket {
       this.reconnectAttempts++;
       
       setTimeout(() => {
+        this.connectionPromise = null;
         this.connect().catch(() => {
           // Connection failed, will try again if under limit
         });
       }, this.reconnectDelay * this.reconnectAttempts);
     } else {
       this.error = 'Failed to reconnect to server';
+      this.events.onError?.(this.error);
     }
   }
 
@@ -138,9 +183,15 @@ export class GameWebSocket {
       this.ws = null;
     }
     this.connected = false;
+    this.connectionPromise = null;
   }
 
   isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  // Method to update event handlers
+  updateEvents(events: Partial<WebSocketEvents>) {
+    this.events = { ...this.events, ...events };
   }
 }

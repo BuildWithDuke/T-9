@@ -34,7 +34,7 @@
         class:x={cell === Player.X}
         class:o={cell === Player.O}
         disabled={cell !== Player.Empty || winner !== Player.Empty || !isActive}
-        on:click={() => onCellClick(boardIndex, cellIndex)}
+        onclick={(e) => onCellClick(boardIndex, cellIndex)}
       >
         {getPlayerSymbol(cell)}
       </button>

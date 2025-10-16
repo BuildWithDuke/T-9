@@ -1,54 +1,52 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Player, type GameState, type Move } from './types';
-  import { GameWebSocket } from './websocket';
+  import { GameWebSocket, type WebSocketEvents } from './websocket';
   import SmallBoard from './SmallBoard.svelte';
 
   let gameId = $state('');
   let inputGameId = $state('');
-  let wsClient: GameWebSocket = new GameWebSocket();
   let showJoinForm = $state(true);
   
-  // Reactive state that updates when WebSocket state changes
+  // Reactive state
   let connected = $state(false);
   let gameState = $state<GameState | null>(null);
   let error = $state<string>('');
   let playerJoinMessage = $state<string>('');
-  let gameStateVersion = $state(0);
 
-  // Interval to sync WebSocket state with reactive state
-  let syncInterval: number;
+  // Create WebSocket client with event handlers
+  let wsClient: GameWebSocket;
 
   onMount(async () => {
+    const events: WebSocketEvents = {
+      onConnect: () => {
+        connected = true;
+        error = '';
+      },
+      onDisconnect: () => {
+        connected = false;
+      },
+      onGameState: (newGameState: GameState) => {
+        gameState = newGameState;
+      },
+      onPlayerJoin: (message: string) => {
+        playerJoinMessage = message;
+      },
+      onError: (errorMessage: string) => {
+        error = errorMessage;
+      }
+    };
+
+    wsClient = new GameWebSocket(undefined, events);
+
     try {
       await wsClient.connect();
     } catch (err) {
-      wsClient.error = 'Failed to connect to server. Make sure the backend is running on port 8080.';
+      error = 'Failed to connect to server. Make sure the backend is running on port 8080.';
     }
-
-    // Sync WebSocket state with reactive state every 100ms
-    syncInterval = setInterval(() => {
-      const oldConnected = connected;
-      const oldGameStateStr = gameState ? JSON.stringify(gameState) : null;
-      
-      // Use the method, not the property, for accurate connection status
-      connected = wsClient.isConnected();
-      error = wsClient.error;
-      playerJoinMessage = wsClient.playerJoinMessage;
-      
-      // Only update gameState if it actually changed
-      const newGameStateStr = wsClient.gameState ? JSON.stringify(wsClient.gameState) : null;
-      if (oldGameStateStr !== newGameStateStr) {
-        gameState = wsClient.gameState ? JSON.parse(JSON.stringify(wsClient.gameState)) : null;
-        gameStateVersion++;
-      }
-    }, 100);
   });
 
   onDestroy(() => {
-    if (syncInterval) {
-      clearInterval(syncInterval);
-    }
     if (wsClient) {
       wsClient.disconnect();
     }
@@ -75,19 +73,19 @@
 
   function joinGame() {
     if (!inputGameId.trim()) {
-      wsClient.error = 'Please enter a game ID';
+      error = 'Please enter a game ID';
       return;
     }
 
     if (!wsClient.isConnected()) {
-      wsClient.error = 'Not connected to server';
+      error = 'Not connected to server';
       return;
     }
 
     gameId = inputGameId.trim();
     wsClient.joinGame(gameId);
     showJoinForm = false;
-    wsClient.error = '';
+    error = '';
   }
 
   function handleCellClick(bigBoardIndex: number, smallBoardIndex: number) {
@@ -127,15 +125,15 @@
     showJoinForm = true;
     gameId = '';
     inputGameId = '';
-    wsClient.gameState = null;
-    wsClient.error = '';
-    wsClient.playerJoinMessage = '';
+    gameState = null;
+    error = '';
+    playerJoinMessage = '';
   }
 
   function copyGameId() {
     navigator.clipboard.writeText(gameId);
-    wsClient.playerJoinMessage = 'Game ID copied to clipboard!';
-    setTimeout(() => wsClient.playerJoinMessage = '', 2000);
+    playerJoinMessage = 'Game ID copied to clipboard!';
+    setTimeout(() => playerJoinMessage = '', 2000);
   }
 </script>
 
@@ -151,16 +149,16 @@
       <div class="lobby">
         <h2>Join or Create Game</h2>
         <div class="lobby-controls">
-          <button on:click={createGame} disabled={!connected}>
+          <button onclick={createGame} disabled={!connected}>
             🎮 Create New Game
           </button>
           <div class="join-form">
             <input 
               bind:value={inputGameId} 
               placeholder="Enter Game ID" 
-              on:keydown={(e) => e.key === 'Enter' && joinGame()}
+              onkeydown={(e) => e.key === 'Enter' && joinGame()}
             />
-            <button on:click={joinGame} disabled={!connected || !inputGameId.trim()}>
+            <button onclick={joinGame} disabled={!connected || !inputGameId.trim()}>
               🚪 Join Game
             </button>
           </div>
@@ -172,7 +170,7 @@
           <h3>🎮 Share this Game ID with your friend:</h3>
           <div class="game-id-display">
             <code class="game-id-code">{gameId}</code>
-            <button class="copy-btn" on:click={copyGameId} title="Copy Game ID">📋 Copy</button>
+            <button class="copy-btn" onclick={copyGameId} title="Copy Game ID">📋 Copy</button>
           </div>
           <p class="instruction">Your friend should click "Join Game" and enter this ID</p>
         </div>
@@ -230,7 +228,7 @@
     </div>
 
     <div class="game-controls">
-      <button on:click={resetGame}>
+      <button onclick={resetGame}>
         🏠 Back to Lobby
       </button>
     </div>

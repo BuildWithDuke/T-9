@@ -1,8 +1,9 @@
 <script lang="ts">
   import Game from '$lib/Game.svelte';
   import MultiplayerGame from '$lib/MultiplayerGame.svelte';
+  import AIGame from '$lib/AIGame.svelte';
 
-  let gameMode = $state<'menu' | 'single' | 'multi'>('menu');
+  let gameMode = $state<'menu' | 'single' | 'multi' | 'ai'>('menu');
 
   function selectSinglePlayer() {
     gameMode = 'single';
@@ -10,6 +11,10 @@
 
   function selectMultiplayer() {
     gameMode = 'multi';
+  }
+
+  function selectAI() {
+    gameMode = 'ai';
   }
 
   function backToMenu() {
@@ -25,27 +30,38 @@
     </header>
 
     <div class="menu-options">
-      <button class="mode-button single" on:click={selectSinglePlayer}>
-        <div class="mode-icon">🤖</div>
-        <h2>Single Player</h2>
+      <button class="mode-button single" onclick={selectSinglePlayer}>
+        <div class="mode-icon">👥</div>
+        <h2>Local 2-Player</h2>
         <p>Play locally on the same device</p>
       </button>
 
-      <button class="mode-button multi" on:click={selectMultiplayer}>
+      <button class="mode-button ai" onclick={selectAI}>
+        <div class="mode-icon">🤖</div>
+        <h2>VS AI</h2>
+        <p>Challenge the computer opponent</p>
+      </button>
+
+      <button class="mode-button multi" onclick={selectMultiplayer}>
         <div class="mode-icon">🌐</div>
-        <h2>Multiplayer</h2>
+        <h2>Online Multiplayer</h2>
         <p>Play online with a friend</p>
       </button>
     </div>
   </div>
 {:else if gameMode === 'single'}
   <div class="game-wrapper">
-    <button class="back-button" on:click={backToMenu}>← Back to Menu</button>
+    <button class="back-button" onclick={backToMenu}>← Back to Menu</button>
     <Game />
+  </div>
+{:else if gameMode === 'ai'}
+  <div class="game-wrapper">
+    <button class="back-button" onclick={backToMenu}>← Back to Menu</button>
+    <AIGame />
   </div>
 {:else if gameMode === 'multi'}
   <div class="game-wrapper">
-    <button class="back-button" on:click={backToMenu}>← Back to Menu</button>
+    <button class="back-button" onclick={backToMenu}>← Back to Menu</button>
     <MultiplayerGame />
   </div>
 {/if}
@@ -73,7 +89,7 @@
 
   .menu-options {
     display: flex;
-    gap: 30px;
+    gap: 20px;
     justify-content: center;
     flex-wrap: wrap;
   }
@@ -82,8 +98,8 @@
     background: white;
     border: 3px solid #e0e0e0;
     border-radius: 16px;
-    padding: 30px;
-    width: 250px;
+    padding: 25px 20px;
+    width: 220px;
     cursor: pointer;
     transition: all 0.3s ease;
     text-align: center;
@@ -95,6 +111,11 @@
   }
 
   .mode-button.single:hover {
+    border-color: #ff9800;
+    background: #fff8f0;
+  }
+
+  .mode-button.ai:hover {
     border-color: #ff9800;
     background: #fff8f0;
   }
@@ -152,6 +173,10 @@
     
     .mode-button {
       width: 280px;
+    }
+    
+    .menu-options {
+      gap: 15px;
     }
   }
 </style>

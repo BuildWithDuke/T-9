@@ -39,9 +39,13 @@
         player: gameState.currentPlayer
       };
 
-      gameState = await GameAPI.makeMove(gameId, move);
+      const newGameState = await GameAPI.makeMove(gameId, move);
+      if (newGameState) {
+        gameState = newGameState;
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to make move';
+      // Don't nullify the game state on error, keep the current state
     }
   }
 
@@ -118,7 +122,7 @@
     </div>
 
     <div class="game-controls">
-      <button on:click={createNewGame} disabled={loading}>
+      <button onclick={createNewGame} disabled={loading}>
         🎮 New Game
       </button>
     </div>
