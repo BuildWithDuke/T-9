@@ -52,17 +52,8 @@
     }
   });
 
-  function generateRandomSuffix(length: number = 5): string {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  }
-
   function createGame() {
-    // Generate a fun fruit/vegetable-based game ID with unique suffix
+    // Generate a fun fruit/vegetable-based game ID
     const produce = [
       // Fruits
       'apple', 'banana', 'cherry', 'dragon', 'elderberry', 'fig', 'grape', 'honeydew',
@@ -74,10 +65,8 @@
       'mushroom', 'onion', 'potato', 'radish', 'spinach', 'tomato', 'zucchini',
       'pepper', 'corn', 'bean', 'pea', 'cabbage', 'asparagus', 'artichoke', 'beet'
     ];
-
-    const baseName = produce[Math.floor(Math.random() * produce.length)];
-    const suffix = generateRandomSuffix();
-    gameId = `${baseName}-${suffix}`;
+    
+    gameId = produce[Math.floor(Math.random() * produce.length)];
     inputGameId = gameId;
     joinGame();
   }
