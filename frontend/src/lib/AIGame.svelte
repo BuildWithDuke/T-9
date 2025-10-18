@@ -68,6 +68,9 @@
       // If game not over, make AI move after short delay
       if (!gameState.gameOver) {
         setTimeout(() => makeAIMoveAsync(), 800);
+      } else {
+        // Game is over (player won or tied), unlock UI
+        isLoading = false;
       }
     } catch (err) {
       error = 'Failed to make move';
