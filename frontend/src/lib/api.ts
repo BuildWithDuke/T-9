@@ -10,30 +10,42 @@ export interface AIResponse {
 
 export class GameAPI {
   static async createGame(): Promise<GameResponse> {
-    return safeAsync(async () => {
+    const result = await safeAsync(async () => {
       const response = await safeFetch(`${API_BASE}/games`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-      
+
       return await response.json();
-    }) || Promise.reject(ErrorFactory.network('Failed to create game'));
+    });
+
+    if (!result) {
+      throw ErrorFactory.network('Failed to create game');
+    }
+
+    return result;
   }
 
   static async getGame(gameId: string): Promise<GameState> {
-    return safeAsync(async () => {
+    const result = await safeAsync(async () => {
       const response = await safeFetch(`${API_BASE}/games/${gameId}`);
       return await response.json();
-    }) || Promise.reject(ErrorFactory.network('Failed to get game'));
+    });
+
+    if (!result) {
+      throw ErrorFactory.network('Failed to get game');
+    }
+
+    return result;
   }
 
   static async makeMove(gameId: string, move: Move): Promise<GameState> {
-    return safeAsync(async () => {
+    const result = await safeAsync(async () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-      
+
       try {
         const response = await safeFetch(`${API_BASE}/games/${gameId}/moves`, {
           method: 'POST',
@@ -43,7 +55,7 @@ export class GameAPI {
           body: JSON.stringify(move),
           signal: controller.signal,
         });
-        
+
         clearTimeout(timeoutId);
         return await response.json();
       } catch (error) {
@@ -53,11 +65,17 @@ export class GameAPI {
         }
         throw error;
       }
-    }) || Promise.reject(ErrorFactory.game('Failed to make move'));
+    });
+
+    if (!result) {
+      throw ErrorFactory.game('Failed to make move');
+    }
+
+    return result;
   }
 
   static async makeAIMove(gameId: string, difficulty: 'easy' | 'medium' | 'hard'): Promise<AIResponse> {
-    return safeAsync(async () => {
+    const result = await safeAsync(async () => {
       const response = await safeFetch(`${API_BASE}/games/${gameId}/ai-move`, {
         method: 'POST',
         headers: {
@@ -65,9 +83,15 @@ export class GameAPI {
         },
         body: JSON.stringify({ difficulty }),
       });
-      
+
       return await response.json();
-    }) || Promise.reject(ErrorFactory.game('Failed to make AI move'));
+    });
+
+    if (!result) {
+      throw ErrorFactory.game('Failed to make AI move');
+    }
+
+    return result;
   }
 
   // Health check method
